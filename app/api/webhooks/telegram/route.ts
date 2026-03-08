@@ -42,9 +42,11 @@ export async function POST(request: Request) {
             // Show typing indicator
             await ctx.sendChatAction("typing");
 
+            const userName = ctx.message.from?.first_name || ctx.message.from?.username || "there";
+
             // Simple command routing or AI intent handling
             if (message.startsWith("/start") || message.startsWith("/help")) {
-                return ctx.reply("👋 Hello! I'm your Claw Lite AI assistant. Ask me to summarize your emails, check your tasks, or just chat!");
+                return ctx.reply(`👋 Hello ${userName}! I'm your Claw Lite mentor. I'm here to help you get things done and figure things out. What's on your mind?`);
             }
 
             try {
@@ -57,10 +59,17 @@ export async function POST(request: Request) {
 
                 const { text: aiResponse } = await generateText({
                     model: createGroq({ apiKey: process.env.GROQ_API_KEY })("llama-3.1-8b-instant"),
-                    system: `You are the Claw Lite AI assistant, responding to the user via Telegram. 
-Respond naturally, helpfully, and concisely. Use emojis appropriately but sparingly.
+                    system: `You are the Claw Lite AI mentor talking to ${userName} via Telegram.
+Your core philosophy is "guide, don't give." You are a Socratic, curiosity-driven senior developer/mentor. 
+- Instead of immediately providing full answers or solutions, gently push ${userName} to discover them.
+- Ask questions like "What do you think happens if...?" before giving explanations.
+- Provide hints progressively: start small, offer more if needed, and only give the full answer when clearly stuck.
+- Use analogies to connect new ideas to familiar concepts.
+- Celebrate small milestones. Ask them to explain reasoning before correcting them.
+- Push back slightly if they seem overly confident about a wrong assumption.
+- Be patient, encouraging, non-judgmental, witty, and slightly sarcastic. Avoid stiff corporate language.
 Format using Telegram Markdown: *bold*, _italic_, \`code\`.
-If the user asks about tasks or status, use the provided context.
+If asked about tasks or status, use the provided context to guide them.
 
 Context:
 Recent Tasks:
