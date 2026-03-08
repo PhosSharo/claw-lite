@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarIcon, MailIcon, CheckCircle2 } from "lucide-react";
+import { CalendarIcon, MailIcon, CheckCircle2, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -20,11 +20,11 @@ const PROVIDERS = [
     },
 ] as const;
 
-type ProviderKey = (typeof PROVIDERS)[number]["key"];
+type ProviderKey = (typeof PROVIDERS)[number]["key"] | "telegram";
 
 // Helper to validate provider keys
 function isValidProvider(value: string | null): value is ProviderKey {
-    return value !== null && PROVIDERS.some((p) => p.key === value);
+    return value !== null && (PROVIDERS.some((p) => p.key === value) || value === "telegram");
 }
 
 function SettingsContent() {
@@ -173,8 +173,120 @@ function SettingsContent() {
                 </div>
             </div>
 
+            {/* Telegram Bot Configuration */}
+            <TelegramConfig
+                isConnected={connectedProviders.includes("telegram")}
+                onConnectionChange={() => window.location.reload()}
+            />
+
             {/* Heartbeat Configuration */}
             <HeartbeatConfig />
+        </div>
+    );
+}
+
+function TelegramConfig({ isConnected, onConnectionChange }: { isConnected: boolean, onConnectionChange: () => void }) {
+    const [token, setToken] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    const handleConnect = async () => {
+        if (!token) return;
+        setLoading(true);
+        setError("");
+        try {
+            const res = await fetch("/api/integrations/telegram", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                onConnectionChange();
+            } else {
+                setError(data.error || "Failed to connect Telegram");
+            }
+        } catch (e: any) {
+            setError(e.message || "Something went wrong");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDisconnect = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch("/api/integrations", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ provider: "telegram" }),
+            });
+            if (res.ok) {
+                onConnectionChange();
+            }
+        } catch (e) {
+            console.error("Failed to disconnect telegram", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="space-y-4">
+            <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">Telegram Bot</h2>
+            <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 space-y-4">
+                <div className="flex items-start sm:items-center justify-between flex-col sm:flex-row gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center size-10 min-w-10 rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                            <MessageCircle className="size-5 text-zinc-600 dark:text-zinc-400" />
+                        </div>
+                        <div>
+                            <h3 className="font-medium text-zinc-900 dark:text-zinc-100">Telegram Webhook Bot</h3>
+                            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                                Connect Claw Lite directly to Telegram. <a href="https://t.me/botfather" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Get a token from BotFather.</a>
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
+                        {isConnected ? (
+                            <>
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                    <CheckCircle2 className="size-3.5" />
+                                    Connected
+                                </span>
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={handleDisconnect}
+                                    disabled={loading}
+                                >
+                                    {loading ? "Disconnecting..." : "Disconnect"}
+                                </Button>
+                            </>
+                        ) : (
+                            <Button size="sm" onClick={handleConnect} disabled={loading || !token}>
+                                {loading ? "Connecting..." : "Connect"}
+                            </Button>
+                        )}
+                    </div>
+                </div>
+                {!isConnected && (
+                    <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                            Bot Token
+                        </label>
+                        <input
+                            type="text"
+                            value={token}
+                            onChange={(e) => setToken(e.target.value)}
+                            placeholder="1234567890:ABCD...xyz"
+                            className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-600 dark:focus:ring-zinc-500"
+                            disabled={loading}
+                        />
+                        {error && <p className="text-red-600 dark:text-red-400 text-sm mt-2">{error}</p>}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

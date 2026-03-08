@@ -6,7 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { getUserByClerkId } from "@/lib/user";
 
 // Valid provider types
-const VALID_PROVIDERS = ["gmail", "google_calendar"] as const;
+const VALID_PROVIDERS = ["gmail", "google_calendar", "telegram"] as const;
 type Provider = (typeof VALID_PROVIDERS)[number];
 
 export async function GET() {

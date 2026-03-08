@@ -22,6 +22,7 @@ export const subscriptionStatusEnum = pgEnum("subscription_status", [
 export const integrationProviderEnum = pgEnum("integration_provider", [
     "gmail",
     "google_calendar",
+    "telegram",
 ]);
 
 export const taskStatusEnum = pgEnum("task_status", [
