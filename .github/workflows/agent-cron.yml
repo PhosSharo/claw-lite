@@ -1,0 +1,16 @@
+name: Agent Heartbeat Cron
+
+on:
+  schedule:
+    # Run every 15 minutes
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  ping-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Agent Run
+        run: |
+          curl -X POST "${{ secrets.PROD_URL }}/api/agent/run" \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
