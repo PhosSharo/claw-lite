@@ -1,4 +1,4 @@
-import { generateObject } from "ai";
+import { generateText } from "ai";
 import { createGroq } from "@ai-sdk/groq";
 import { z } from "zod";
 
@@ -31,9 +31,8 @@ interface EmailInput {
 
 /** Analyze a single email using AI and return structured output */
 export async function processEmail(email: EmailInput): Promise<EmailAnalysis> {
-    const { object } = await generateObject({
+    const { text } = await generateText({
         model,
-        schema: EmailAnalysisSchema,
         prompt: `Analyze this email and extract structured information.
 
 From: ${email.from}
@@ -44,11 +43,35 @@ ${email.body.slice(0, 2000)}
 
 Instructions:
 - Determine priority (high = urgent/deadline, medium = requires action, low = informational)
-- Categorize the email
+- Categorize the email (work, personal, newsletter, notification, spam)
 - If a reply is needed, draft a professional, concise response
 - Extract any action items with titles, descriptions, and due dates
-- Be concise in all fields`,
+- Be concise in all fields
+
+You MUST return EXACTLY and ONLY a valid JSON object matching this schema. Do not include markdown code block syntax (\`\`\`json) or any other text before or after the JSON.
+
+{
+  "summary": "One-line summary of the email",
+  "priority": "low" | "medium" | "high",
+  "category": "work" | "personal" | "newsletter" | "notification" | "spam",
+  "needsReply": boolean,
+  "draftReply": "Draft reply if needsReply is true, null otherwise",
+  "actionItems": [
+    {
+      "title": "Action item title",
+      "description": "Action item description",
+      "dueDate": "ISO date string or null"
+    }
+  ]
+}`,
     });
 
-    return object;
+    try {
+        const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+        return EmailAnalysisSchema.parse(parsed);
+    } catch (error) {
+        console.error("Failed to parse AI response:", text);
+        throw new Error("Invalid AI response format");
+    }
 }
