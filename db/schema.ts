@@ -82,6 +82,7 @@ export const users = pgTable("users", {
         .notNull(),
     subscriptionId: text("subscription_id"),
     agentEnabled: boolean("agent_enabled").default(true).notNull(),
+    heartbeatInterval: integer("heartbeat_interval").default(15).notNull(), // minutes
     onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
     preferences: jsonb("preferences").default({}).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
