@@ -3,30 +3,68 @@ import {
     text,
     timestamp,
     integer,
+    boolean,
+    jsonb,
+    uuid,
     pgEnum,
-    uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
+export const subscriptionStatusEnum = pgEnum("subscription_status", [
+    "none",
+    "active",
+    "canceled",
+    "past_due",
+]);
+
 export const integrationProviderEnum = pgEnum("integration_provider", [
-    "google",
+    "gmail",
+    "google_calendar",
+]);
+
+export const taskStatusEnum = pgEnum("task_status", [
+    "pending",
+    "completed",
+    "cancelled",
+]);
+
+export const taskPriorityEnum = pgEnum("task_priority", [
+    "low",
+    "medium",
+    "high",
 ]);
 
 export const agentRunStatusEnum = pgEnum("agent_run_status", [
     "running",
-    "complete",
+    "success",
     "failed",
 ]);
 
-export const taskPriorityEnum = pgEnum("task_priority", [
-    "high",
-    "med",
-    "low",
-]);
+// ─── Interfaces ───────────────────────────────────────────────────────────────
 
-export const taskStatusEnum = pgEnum("task_status", ["todo", "done"]);
+/** Shape of each entry in agentRuns.actionsLog (jsonb) */
+export interface ActionLogEntry {
+    emailId: string;
+    from: string;
+    subject: string;
+    date: string;
+    status: "success" | "error";
+    summary?: string;
+    priority?: string;
+    category?: string;
+    needsReply?: boolean;
+    draftReply?: string | null;
+    actionItems?: {
+        title: string;
+        description: string;
+        dueDate: string | null;
+    }[];
+    tasksCreated?: number;
+    draftCreated?: boolean;
+    eventsCreated?: number;
+}
 
 // ─── Tables ───────────────────────────────────────────────────────────────────
 
@@ -35,33 +73,56 @@ export const taskStatusEnum = pgEnum("task_status", ["todo", "done"]);
  * Core identity table — synced with Clerk for auth.
  */
 export const users = pgTable("users", {
-    id: text("id").primaryKey(),
-    clerkUserId: text("clerk_user_id").unique().notNull(),
-    email: text("email").unique().notNull(),
+    id: uuid("id").defaultRandom().primaryKey(),
+    clerkId: text("clerk_id").unique().notNull(),
+    email: text("email").notNull(),
     name: text("name"),
+    subscriptionStatus: subscriptionStatusEnum("subscription_status")
+        .default("none")
+        .notNull(),
+    subscriptionId: text("subscription_id"),
+    agentEnabled: boolean("agent_enabled").default(true).notNull(),
+    onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
+    preferences: jsonb("preferences").default({}).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 /**
  * integrations
- * OAuth connections (e.g. Google).
- * accessToken & refreshToken are encrypted at rest with AES-256-GCM
- * before being persisted — handle encryption in the application layer.
+ * OAuth connections (gmail, google_calendar).
+ * accessToken & refreshToken are encrypted at rest — handle in app layer.
  */
 export const integrations = pgTable("integrations", {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
-        .notNull()
-        .references(() => users.id, { onDelete: "cascade" }),
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+        .references(() => users.id, { onDelete: "cascade" })
+        .notNull(),
     provider: integrationProviderEnum("provider").notNull(),
-    // Store the ciphertext produced by AES-256-GCM encryption
-    accessToken: text("access_token").notNull(),   // encrypted
-    refreshToken: text("refresh_token"),             // encrypted
-    tokenExpiresAt: timestamp("token_expires_at"),
-    scope: text("scope"),
+    accessToken: text("access_token").notNull(),   // Encrypted
+    refreshToken: text("refresh_token").notNull(),   // Encrypted
+    expiresAt: timestamp("expires_at"),
+    scope: text("scope").array().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/**
+ * tasks
+ * Structured action items surfaced by the agent or created manually.
+ */
+export const tasks = pgTable("tasks", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+        .references(() => users.id, { onDelete: "cascade" })
+        .notNull(),
+    title: text("title").notNull(),
+    description: text("description"),
+    status: taskStatusEnum("status").default("pending").notNull(),
+    priority: taskPriorityEnum("priority").default("medium").notNull(),
+    dueDate: timestamp("due_date"),
+    createdByAgent: boolean("created_by_agent").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at"),
 });
 
 /**
@@ -69,38 +130,23 @@ export const integrations = pgTable("integrations", {
  * One record per autonomous execution loop invocation.
  */
 export const agentRuns = pgTable("agent_runs", {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
-        .notNull()
-        .references(() => users.id, { onDelete: "cascade" }),
-    status: agentRunStatusEnum("status").notNull().default("running"),
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+        .references(() => users.id, { onDelete: "cascade" })
+        .notNull(),
+    status: agentRunStatusEnum("status").default("running").notNull(),
+    summary: text("summary"),
+    actionsLog: jsonb("actions_log")
+        .$type<ActionLogEntry[]>()
+        .default([])
+        .notNull(),
     emailsProcessed: integer("emails_processed").default(0).notNull(),
     tasksCreated: integer("tasks_created").default(0).notNull(),
     draftsCreated: integer("drafts_created").default(0).notNull(),
-    summary: text("summary"),
+    errorMessage: text("error_message"),
     startedAt: timestamp("started_at").defaultNow().notNull(),
     completedAt: timestamp("completed_at"),
-});
-
-/**
- * tasks
- * Structured action items surfaced by the agent.
- */
-export const tasks = pgTable("tasks", {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
-        .notNull()
-        .references(() => users.id, { onDelete: "cascade" }),
-    agentRunId: text("agent_run_id")
-        .notNull()
-        .references(() => agentRuns.id, { onDelete: "cascade" }),
-    title: text("title").notNull(),
-    description: text("description"),
-    priority: taskPriorityEnum("priority").notNull().default("med"),
-    status: taskStatusEnum("status").notNull().default("todo"),
-    sourceEmailId: text("source_email_id"),   // external email message ID
-    dueDate: timestamp("due_date"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    durationMs: integer("duration_ms"),
 });
 
 // ─── Relations ────────────────────────────────────────────────────────────────
@@ -118,12 +164,11 @@ export const integrationsRelations = relations(integrations, ({ one }) => ({
     }),
 }));
 
-export const agentRunsRelations = relations(agentRuns, ({ one, many }) => ({
+export const agentRunsRelations = relations(agentRuns, ({ one }) => ({
     user: one(users, {
         fields: [agentRuns.userId],
         references: [users.id],
     }),
-    tasks: many(tasks),
 }));
 
 export const tasksRelations = relations(tasks, ({ one }) => ({
@@ -131,13 +176,9 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
         fields: [tasks.userId],
         references: [users.id],
     }),
-    agentRun: one(agentRuns, {
-        fields: [tasks.agentRunId],
-        references: [agentRuns.id],
-    }),
 }));
 
-// ─── Type exports (Drizzle inferred types) ────────────────────────────────────
+// ─── Inferred Types ───────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -145,8 +186,10 @@ export type NewUser = typeof users.$inferInsert;
 export type Integration = typeof integrations.$inferSelect;
 export type NewIntegration = typeof integrations.$inferInsert;
 
+export type Task = typeof tasks.$inferSelect;
+export type NewTask = typeof tasks.$inferInsert;
+
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type NewAgentRun = typeof agentRuns.$inferInsert;
 
-export type Task = typeof tasks.$inferSelect;
-export type NewTask = typeof tasks.$inferInsert;
+export type ProcessedEmail = ActionLogEntry & { processedAt: Date };
