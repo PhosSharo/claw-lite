@@ -17,16 +17,18 @@
 
 ## 🎯 What is Claw Lite?
 
-**Claw Lite** is a lightweight, autonomous AI agent that runs on a configurable heartbeat (e.g., every 15 minutes). It connects to your Gmail and Google Calendar to process your unread emails, extract actionable tasks, auto-draft replies, and summarize your digital activity. 
+**Claw Lite** is a lightweight, autonomous AI agent that automates digital workflows. It connects to your Gmail and Google Calendar to process unread emails, extract tasks, and auto-draft replies.
 
-Designed for early-career developers and busy professionals, it features a Socratic, mentor-style Telegram bot interface. Instead of a clunky dashboard, your AI assistant lives right in your chat app, guiding you through tasks securely and efficiently.
+*Note: This project is a simplified clone of OpenClaw, optimized for free-tier deployments like Vercel Hobby.*
+
+It replaces a traditional dashboard with a Telegram bot interface, allowing you to interact with your AI assistant directly from your chat app.
 
 ### ✨ Key Features
-*   **Autonomous Heartbeat:** Runs entirely in the background via Vercel Cron or GitHub Actions.
-*   **Intelligent Email Processing:** Uses Groq (`llama-3.1-8b-instant`) to read emails, categorize them, and generate drafts.
-*   **Actionable Task Extraction:** Automatically parses emails to create a definitive daily checklist.
-*   **Telegram Command Center:** Interact seamlessly with your agent via a Telegram Webhook bot that uses RAG (Retrieval-Augmented Generation) on your database.
-*   **Privacy-First:** Secure AES-256-GCM encryption for all OAuth tokens.
+*   **Configurable Heartbeat:** Runs periodically in the background via a cron job (e.g., Vercel Cron or GitHub Actions) based on your configured interval.
+*   **Email Processing:** Uses Groq (`llama-3.1-8b-instant`) to read emails, categorize them, and generate drafts.
+*   **Task Extraction:** Automatically parses emails to create a daily checklist.
+*   **Telegram Bot Interface:** Interact with your agent via a Telegram Webhook bot. It queries your database to act as an on-demand assistant and task manager.
+*   **Data Security:** Secures all OAuth tokens using AES-256-GCM encryption.
 
 ---
 
