@@ -121,8 +121,4 @@ Open Telegram and message your newly configured bot.
 
 ---
 
-## 🤝 Support
 
-Encountered an issue or want to contribute?
-*   Open an [Issue](https://github.com/YourOrg/claw-lite/issues).
-*   Review our architecture guides in `.agents/guide/`.
